@@ -27,11 +27,16 @@ The following packages `mesa-common-dev` and `mesa-utils` **do NOT work** and in
 
 **How do I try it?**
 
+Download EGL, GLESv2, and GBM using this command:
+```
+sudo apt install libgles2-mesa-dev libegl1-mesa-dev libgbm-dev
+```
+
 Copy or download the `triangle.c` file onto your Raspberry Pi. Use the following commands to compile the source file:
 
 ```
-gcc -c triangle.c -o triangle.o -I/opt/vc/include
-gcc -o triangle triangle.o -lbrcmEGL -lbrcmGLESv2 -L/opt/vc/lib
+gcc -c triangle.c -o triangle.o -I/usr/include
+gcc -o triangle triangle.o -lEGL -lGLESv2 -lgbm
 ```
 
 To run the executable, type the following:

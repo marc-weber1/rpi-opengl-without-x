@@ -1,7 +1,6 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <fcntl.h>
-#include <iostream>
 #include <gbm.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -116,23 +115,23 @@ int main(int argv, char **argc)
     // Open the DRM device
     int drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
     if (drm_fd < 0) {
-        std::cerr << "Failed to open DRM device\n";
+        fprintf(stderr, "Failed to open DRM device\n");
         return -1;
     }
 
     // Create a GBM device
-    gbm_device* gbm = gbm_create_device(drm_fd);
+    struct gbm_device* gbm = gbm_create_device(drm_fd);
     if (!gbm) {
-        std::cerr << "Failed to create GBM device\n";
+        fprintf(stderr, "Failed to create GBM device\n");
         close(drm_fd);
         return -1;
     }
 
     // Create a GBM surface
-    gbm_surface* gbmSurface = gbm_surface_create(gbm, 800, 600, GBM_FORMAT_ARGB8888, 
+    struct gbm_surface* gbmSurface = gbm_surface_create(gbm, 800, 600, GBM_FORMAT_ARGB8888, 
                                                  GBM_BO_USE_RENDERING);
     if (!gbmSurface) {
-        std::cerr << "Failed to create GBM surface\n";
+        fprintf(stderr, "Failed to create GBM surface\n");
         gbm_device_destroy(gbm);
         close(drm_fd);
         return -1;
@@ -141,7 +140,7 @@ int main(int argv, char **argc)
     // Initialize EGL
     display = eglGetDisplay(gbm);
     if (display == EGL_NO_DISPLAY) {
-        std::cerr << "Failed to get EGL display\n";
+        fprintf(stderr, "Failed to get EGL display\n");
         gbm_surface_destroy(gbmSurface);
         gbm_device_destroy(gbm);
         close(drm_fd);
@@ -187,9 +186,9 @@ int main(int argv, char **argc)
         return EXIT_FAILURE;
     }
 
-    EGLSurface surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType) gbmSurface, nullptr);
+    EGLSurface surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType) gbmSurface, NULL);
     if (surface == EGL_NO_SURFACE) {
-        std::cerr << "Failed to create EGL surface\n";
+        fprintf(stderr, "Failed to create EGL surface\n");
         eglDestroyContext(display, context);
         eglTerminate(display);
         gbm_surface_destroy(gbmSurface);
