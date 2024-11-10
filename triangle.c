@@ -1,21 +1,22 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
+#include <fcntl.h>
+#include <iostream>
+#include <gbm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 static const EGLint configAttribs[] = {
-    EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_BLUE_SIZE, 8, EGL_GREEN_SIZE, 8,
-    EGL_RED_SIZE, 8, EGL_DEPTH_SIZE, 8,
-
-    // Uncomment the following to enable MSAA
-    // EGL_SAMPLE_BUFFERS, 1, // <-- Must be set to 1 to enable multisampling!
-    // EGL_SAMPLES, 4, // <-- Number of samples
-
-    // Uncomment the following to enable stencil buffer
-    // EGL_STENCIL_SIZE, 1,
-
-    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT, EGL_NONE};
+        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+        EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8,
+        EGL_BLUE_SIZE, 8,
+        EGL_ALPHA_SIZE, 8,
+        EGL_DEPTH_SIZE, 24,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
+        EGL_NONE
+    };
 
 // Width and height of the desired framebuffer
 static const EGLint pbufferAttribs[] = {
@@ -112,11 +113,39 @@ int main(int argv, char **argc)
     GLuint program, vert, frag, vbo;
     GLint posLoc, colorLoc, result;
 
-    if ((display = eglGetDisplay(EGL_DEFAULT_DISPLAY)) == EGL_NO_DISPLAY)
-    {
-        fprintf(stderr, "Failed to get EGL display! Error: %s\n",
-                eglGetErrorStr());
-        return EXIT_FAILURE;
+    // Open the DRM device
+    int drm_fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (drm_fd < 0) {
+        std::cerr << "Failed to open DRM device\n";
+        return -1;
+    }
+
+    // Create a GBM device
+    gbm_device* gbm = gbm_create_device(drm_fd);
+    if (!gbm) {
+        std::cerr << "Failed to create GBM device\n";
+        close(drm_fd);
+        return -1;
+    }
+
+    // Create a GBM surface
+    gbm_surface* gbmSurface = gbm_surface_create(gbm, 800, 600, GBM_FORMAT_ARGB8888, 
+                                                 GBM_BO_USE_RENDERING);
+    if (!gbmSurface) {
+        std::cerr << "Failed to create GBM surface\n";
+        gbm_device_destroy(gbm);
+        close(drm_fd);
+        return -1;
+    }
+
+    // Initialize EGL
+    display = eglGetDisplay(gbm);
+    if (display == EGL_NO_DISPLAY) {
+        std::cerr << "Failed to get EGL display\n";
+        gbm_surface_destroy(gbmSurface);
+        gbm_device_destroy(gbm);
+        close(drm_fd);
+        return -1;
     }
 
     if (eglInitialize(display, &major, &minor) == EGL_FALSE)
@@ -124,6 +153,9 @@ int main(int argv, char **argc)
         fprintf(stderr, "Failed to get EGL version! Error: %s\n",
                 eglGetErrorStr());
         eglTerminate(display);
+        gbm_surface_destroy(gbmSurface);
+        gbm_device_destroy(gbm);
+        close(drm_fd);
         return EXIT_FAILURE;
     }
 
@@ -136,20 +168,11 @@ int main(int argv, char **argc)
         fprintf(stderr, "Failed to get EGL config! Error: %s\n",
                 eglGetErrorStr());
         eglTerminate(display);
+        gbm_surface_destroy(gbmSurface);
+        gbm_device_destroy(gbm);
+        close(drm_fd);
         return EXIT_FAILURE;
     }
-
-    EGLSurface surface =
-        eglCreatePbufferSurface(display, config, pbufferAttribs);
-    if (surface == EGL_NO_SURFACE)
-    {
-        fprintf(stderr, "Failed to create EGL surface! Error: %s\n",
-                eglGetErrorStr());
-        eglTerminate(display);
-        return EXIT_FAILURE;
-    }
-
-    eglBindAPI(EGL_OPENGL_API);
 
     EGLContext context =
         eglCreateContext(display, config, EGL_NO_CONTEXT, contextAttribs);
@@ -157,10 +180,25 @@ int main(int argv, char **argc)
     {
         fprintf(stderr, "Failed to create EGL context! Error: %s\n",
                 eglGetErrorStr());
-        eglDestroySurface(display, surface);
         eglTerminate(display);
+        gbm_surface_destroy(gbmSurface);
+        gbm_device_destroy(gbm);
+        close(drm_fd);
         return EXIT_FAILURE;
     }
+
+    EGLSurface surface = eglCreateWindowSurface(display, config, (EGLNativeWindowType) gbmSurface, nullptr);
+    if (surface == EGL_NO_SURFACE) {
+        std::cerr << "Failed to create EGL surface\n";
+        eglDestroyContext(display, context);
+        eglTerminate(display);
+        gbm_surface_destroy(gbmSurface);
+        gbm_device_destroy(gbm);
+        close(drm_fd);
+        return -1;
+    }
+
+    eglBindAPI(EGL_OPENGL_API);
 
     eglMakeCurrent(display, surface, surface, context);
 
@@ -262,5 +300,8 @@ int main(int argv, char **argc)
     eglDestroyContext(display, context);
     eglDestroySurface(display, surface);
     eglTerminate(display);
+    gbm_surface_destroy(gbmSurface);
+    gbm_device_destroy(gbm);
+    close(drm_fd);
     return EXIT_SUCCESS;
 }
