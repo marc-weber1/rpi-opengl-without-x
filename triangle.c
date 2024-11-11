@@ -107,6 +107,23 @@ static const char *eglGetErrorStr()
     return "Unknown error!";
 }
 
+void checkGLError(const char *functionName) {
+    GLenum error = glGetError();
+    while (error != GL_NO_ERROR) {
+        const char *errorString;
+        switch (error) {
+            case GL_INVALID_ENUM:      errorString = "GL_INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:     errorString = "GL_INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION: errorString = "GL_INVALID_OPERATION"; break;
+            case GL_OUT_OF_MEMORY:     errorString = "GL_OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: errorString = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+            default: errorString = "Unknown error"; break;
+        }
+        fprintf(stderr, "OpenGL error in %s: %s\n", functionName, errorString);
+        error = glGetError();
+    }
+}
+
 int main(int argv, char **argc)
 {
     EGLDisplay display;
@@ -131,7 +148,7 @@ int main(int argv, char **argc)
     }
 
     // Create a GBM surface
-    struct gbm_surface* gbmSurface = gbm_surface_create(gbm, 800, 600, GBM_FORMAT_ARGB8888, 
+    struct gbm_surface* gbmSurface = gbm_surface_create(gbm, pbufferAttribs[1], pbufferAttribs[3], GBM_FORMAT_ARGB8888, 
                                                  GBM_BO_USE_RENDERING);
     if (!gbmSurface) {
         fprintf(stderr, "Failed to create GBM surface\n");
@@ -162,6 +179,8 @@ int main(int argv, char **argc)
     }
 
     printf("Initialized EGL version: %d.%d\n", major, minor);
+
+    eglBindAPI(EGL_OPENGL_API);
 
     EGLint numConfigs;
     EGLConfig config;
@@ -200,8 +219,6 @@ int main(int argv, char **argc)
         return -1;
     }
 
-    eglBindAPI(EGL_OPENGL_API);
-
     eglMakeCurrent(display, surface, surface, context);
 
     // The desired width and height is defined inside of pbufferAttribs
@@ -239,7 +256,6 @@ int main(int argv, char **argc)
     // NO ERRRO CHECKING IS DONE! (for the purpose of this example)
     // Read an OpenGL tutorial to properly implement shader creation
     program = glCreateProgram();
-    glUseProgram(program);
     vert = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vert, 1, &vertexShaderCode, NULL);
     glCompileShader(vert);
@@ -250,6 +266,7 @@ int main(int argv, char **argc)
     glAttachShader(program, vert);
     glLinkProgram(program);
     glUseProgram(program);
+    checkGLError("glUseProgram");
 
     // Create Vertex Buffer Object
     // Again, NO ERRRO CHECKING IS DONE! (for the purpose of this example)
@@ -263,7 +280,7 @@ int main(int argv, char **argc)
 
     // Set the desired color of the triangle to pink
     // 100% red, 0% green, 50% blue, 100% alpha
-    glUniform4f(colorLoc, 1.0, 0.0f, 0.5, 1.0);
+    glUniform4f(colorLoc, 1.0f, 0.0f, 0.5f, 1.0f);
 
     // Set our vertex data
     glEnableVertexAttribArray(posLoc);
