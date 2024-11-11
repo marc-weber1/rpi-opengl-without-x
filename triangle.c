@@ -6,13 +6,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image_write.h"
+
+
 static const EGLint configAttribs[] = {
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_RED_SIZE, 8,
         EGL_GREEN_SIZE, 8,
         EGL_BLUE_SIZE, 8,
-        EGL_ALPHA_SIZE, 8,
-        EGL_DEPTH_SIZE, 24,
+        EGL_DEPTH_SIZE, 8,
         EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_NONE
     };
@@ -281,16 +284,7 @@ int main(int argv, char **argc)
                  buffer);
 
     // Write all pixels to file
-    FILE *output = fopen("triangle.raw", "wb");
-    if (output)
-    {
-        fwrite(buffer, 1, desiredWidth * desiredHeight * 3, output);
-        fclose(output);
-    }
-    else
-    {
-        fprintf(stderr, "Failed to open file triangle.raw for writing!\n");
-    }
+    int success = stbi_write_png("triangle.png", desiredWidth, desiredHeight, 3, buffer, 3);
 
     // Free copied pixels
     free(buffer);
