@@ -301,7 +301,7 @@ int main(int argv, char **argc)
                  buffer);
 
     // Write all pixels to file
-    int success = stbi_write_png("triangle.png", desiredWidth, desiredHeight, 3, buffer, 3);
+    int success = stbi_write_png("triangle.png", desiredWidth, desiredHeight, 3, buffer, desiredWidth * 3);
 
     // Free copied pixels
     free(buffer);
